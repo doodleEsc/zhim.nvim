@@ -144,14 +144,6 @@ M.setup = function(opts)
         callback = set_smart_im,
         group = group_id,
     })
-
-    vim.keymap.set("n", "<leader>ee", function()
-        print(get_node_type_in_cursor())
-    end)
-
-    vim.keymap.set("n", "<leader>ef", function()
-        print(vim.bo.filetype)
-    end)
 end
 
 return M
