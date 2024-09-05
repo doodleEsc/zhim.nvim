@@ -32,6 +32,8 @@ local function is_supported()
 end
 
 local default = {
+    enabled = true,
+
     -- im-select binary's name, or the binary's full path
     command = { "im-select.exe" },
 
@@ -113,15 +115,22 @@ local function change_im_select(cmd, im)
 end
 
 local function restore_default_im()
-    change_im_select(M.options.command, M.options.default_im)
+    if M.options.enabled then
+        change_im_select(M.options.command, M.options.default_im)
+    end
 end
 
 local function set_smart_im()
-    -- all change to zh im in some filetype
-
-    if check_enabled_nodes() or check_enabled_ft() then
-        change_im_select(M.options.command, M.options.zh_im)
+    if M.options.enabled then
+        if check_enabled_nodes() or check_enabled_ft() then
+            change_im_select(M.options.command, M.options.zh_im)
+        end
     end
+end
+
+M.toggle = function()
+    local status = M.options.enabled
+    M.options.enabled = not status
 end
 
 M.setup = function(opts)
