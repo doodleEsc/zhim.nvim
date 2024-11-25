@@ -35,13 +35,13 @@ local default = {
     enabled = true,
 
     -- im-select binary's name, or the binary's full path
-    command = { "im-select.exe" },
+    command = "im-select.exe",
 
     -- normal mode im
-    default_im = "1033",
+    default_im = { "1033" },
 
     -- insert mode im
-    zh_im = "2052",
+    zh_im = { "2052" },
 
     -- Restore the default input method state when the following events are triggered
     default_events = { "VimEnter", "FocusGained", "InsertLeave", "CmdlineLeave" },
@@ -49,13 +49,26 @@ local default = {
     -- when to change zh im
     zh_events = { "InsertEnter" },
 
-    -- enabled treesitter nodes
-    nodes = { "comment", "comment_content", "string", "string_content" },
+    -- enabled treesitter nodes, always enabled if nodes is nil or nodes is empty
+    nodes = nil,
 
-    ft = { "markdown" },
+    -- only works in those filetype, always enabled if ft is nil or ft is empty
+    ft = nil,
 }
 
+local function check_table_empty(data)
+    if next(data) == nil then
+        return true
+    end
+
+    return false
+end
+
 local function check_enabled_ft()
+    if M.options.ft == nil or check_table_empty(M.options.ft) then
+        return true
+    end
+
     local current_ft = vim.bo.filetype
     for _, ft in ipairs(M.options.ft) do
         if current_ft == ft then
@@ -68,18 +81,8 @@ end
 -- Get node in user's cursor
 -- In insert mode, cursor's position at cursor right
 local function get_node_in_cursor()
-    -- if check_exclude_node_ft() then
-    --     return
-    -- end
-
     local cursor_pos = vim.api.nvim_win_get_cursor(0)
-    -- because nvim_win_get_cursor is (1, 0)-indexed
-    -- but vim.treesitter.get_node is (0, 0)-indexed
-    -- so row must decrease 1
-    local row, col = cursor_pos[1] - 1, cursor_pos[2]
-    -- local node = vim.treesitter.get_node({ pos = { row, col } })
-    -- return node
-
+    local row, col = cursor_pos[1] - 1, cursor_pos[2] - 1
     local success, node = pcall(vim.treesitter.get_node, { pos = { row, col } })
     return success and node or nil
 end
@@ -90,6 +93,10 @@ local function get_node_type_in_cursor()
 end
 
 local function check_enabled_nodes()
+    if M.options.nodes == nil or check_table_empty(M.options.nodes) then
+        return true
+    end
+
     local current_node_type = get_node_type_in_cursor()
     if current_node_type == nil then
         return false
@@ -104,13 +111,16 @@ local function check_enabled_nodes()
     return false
 end
 
-local function change_im_select(cmd, im)
-    local args = { unpack(cmd, 2) }
-    table.insert(args, im)
-
+local function change_im_select(cmd, args, callback)
     local handle
-    handle = vim.uv.spawn(cmd[1], { args = args, detached = false }, function(code)
+    handle = vim.loop.spawn(cmd, {
+        args = args,
+        detached = false,
+    }, function(code, signal)
         handle:close()
+        if callback then
+            callback(code, signal)
+        end
     end)
 end
 
@@ -122,7 +132,7 @@ end
 
 local function set_smart_im()
     if M.options.enabled then
-        if check_enabled_nodes() or check_enabled_ft() then
+        if check_enabled_nodes() and check_enabled_ft() then
             change_im_select(M.options.command, M.options.zh_im)
         end
     end
