@@ -1,3 +1,5 @@
+local Job = require("plenary.job")
+
 local M = {}
 
 M.options = {}
@@ -112,21 +114,48 @@ local function check_enabled_nodes()
 end
 
 local function change_im_select(cmd, args, callback)
-    local handle
-    handle = vim.loop.spawn(cmd, {
+    local job = Job:new({
+        command = cmd,
         args = args,
-        detached = false,
-    }, function(code, signal)
-        handle:close()
-        if callback then
-            callback(code, signal)
-        end
-    end)
+        on_exit = function(_, code, signal)
+            if code ~= 0 then
+                vim.notify(
+                    string.format(
+                        "Command failed: %s %s, code: %d, signal: %s",
+                        cmd,
+                        table.concat(args, " "),
+                        code,
+                        tostring(signal)
+                    ),
+                    vim.log.levels.ERROR
+                )
+            end
+            if callback then
+                callback(code, signal)
+            end
+        end,
+    })
+
+    job:start()
 end
 
 local function restore_default_im()
     if M.options.enabled then
-        change_im_select(M.options.command, M.options.default_im)
+        -- Add a callback here to see the exit code for default_im changes as well
+        change_im_select(M.options.command, M.options.default_im, function(code, signal)
+            if code ~= 0 then
+                vim.notify(
+                    string.format(
+                        "Restore default IM command failed: %s %s, code: %d, signal: %s",
+                        M.options.command,
+                        table.concat(M.options.default_im, " "),
+                        code,
+                        tostring(signal)
+                    ),
+                    vim.log.levels.ERROR
+                )
+            end
+        end)
     end
 end
 
